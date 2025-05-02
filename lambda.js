@@ -43,7 +43,7 @@ const WS_URL = process.env.WS_URL || (DOMAIN.startsWith('localhost')
   ? `ws://${DOMAIN}/ws`
   : `wss://${DOMAIN}/ws`);
 // Load all configuration from environment variables
-const VOZY_API_URL = process.env.VOZY_API_URL || "https://api.vozy.ai/v2/chat/6e96ac9d-4b10-43f9-a78e-38439023510a";
+const VOZY_API_URL = process.env.VOZY_API_URL || "";
 const VOZY_AUTH_TOKEN = process.env.VOZY_AUTH_TOKEN || "";
 const WELCOME_GREETING = process.env.WELCOME_GREETING || "Hola!";
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful assistant. This conversation is being translated to voice, so answer carefully. When you respond, please spell out all numbers, for example twenty not 20. Do not include emojis in your responses. Do not include bullet points, asterisks, or special symbols.";
@@ -51,7 +51,7 @@ const sessions = new Map();
 const TTS_PROVIDER = process.env.TTS_PROVIDER || "ElevenLabs";
 const VOICE = process.env.VOICE || "J4vZAFDEcpenkMp3f3R9";
 const NLP_LANGUAGE = process.env.NLP_LANGUAGE || "es-ES";
-const AUDIO_URL = process.env.AUDIO_URL || "https://drive.google.com/uc?export=download&id=11TnxQgymbquSXhpYSxyDv-tJzs7xsrMY";
+const AUDIO_URL = process.env.AUDIO_URL || "";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 async function aiResponse(messages) {
