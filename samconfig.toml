@@ -1,0 +1,14 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "Twilio-ConvRelay"
+# Removed s3_bucket to use resolve_s3 instead
+s3_prefix = "Twilio-ConvRelay"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = false
+resolve_s3 = true
+parameter_overrides = "DomainName=\"foo.bar\" Debug=\"false\" VozyApiUrl=\"https://api.vozy.ai/v2/chat/6e96ac9d-4b10-43f9-a78e-38439023510a\" WelcomeGreeting=\"Hola!\" SystemPrompt=\"You\" TtsProvider=\"ElevenLabs\" Voice=\"J4vZAFDEcpenkMp3f3R9\" NlpLanguage=\"es-ES\" AudioUrl=\"https://drive.google.com/uc?export=download&id=11TnxQgymbquSXhpYSxyDv-tJzs7xsrMY\""
+image_repositories = []

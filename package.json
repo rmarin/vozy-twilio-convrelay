@@ -1,0 +1,36 @@
+{
+  "name": "vozy-voice-assistant",
+  "version": "1.0.0",
+  "main": "lambda.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "sam build",
+    "deploy": "sam deploy --guided"
+  },
+  "type": "module",
+  "keywords": [
+    "voice",
+    "assistant",
+    "aws",
+    "lambda",
+    "websocket"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Voice Assistant application for AWS Lambda",
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.797.0",
+    "@fastify/aws-lambda": "^3.0.0",
+    "@fastify/websocket": "^11.0.2",
+    "aws-sdk": "^2.1531.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.86.2",
+    "ws": "^8.18.1"
+  }
+}

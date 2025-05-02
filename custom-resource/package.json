@@ -1,0 +1,9 @@
+{
+  "name": "update-domain-custom-resource",
+  "version": "1.0.0",
+  "description": "CloudFormation custom resource to update Lambda environment variables",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1531.0"
+  }
+}

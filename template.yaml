@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Voice Assistant Application for AWS Lambda
+
+Parameters:
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Description: Your OpenAI API Key
+  
+  VozyAuthToken:
+    Type: String
+    NoEcho: true
+    Description: Your Vozy Auth Token
+  
+  DomainName:
+    Type: String
+    Default: 'foo.bar'
+    Description: Domain for WebSocket connections (will be updated after deployment)
+  
+  Debug:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Debug mode flag
+    
+  VozyApiUrl:
+    Type: String
+    Default: 'https://api.vozy.ai/v2/chat/6e96ac9d-4b10-43f9-a78e-38439023510a'
+    Description: Vozy API URL
+    
+  WelcomeGreeting:
+    Type: String
+    Default: 'Hola!'
+    Description: Welcome greeting for voice assistant
+    
+  SystemPrompt:
+    Type: String
+    Default: 'You are a helpful assistant. This conversation is being translated to voice, so answer carefully. When you respond, please spell out all numbers, for example twenty not 20. Do not include emojis in your responses. Do not include bullet points, asterisks, or special symbols.'
+    Description: System prompt for the assistant
+    
+  TtsProvider:
+    Type: String
+    Default: 'ElevenLabs'
+    Description: Text-to-speech provider
+    
+  Voice:
+    Type: String
+    Default: 'J4vZAFDEcpenkMp3f3R9'
+    Description: Voice ID for text-to-speech
+    
+  NlpLanguage:
+    Type: String
+    Default: 'es-ES'
+    Description: Language for NLP processing
+    
+  AudioUrl:
+    Type: String
+    Default: 'https://drive.google.com/uc?export=download&id=11TnxQgymbquSXhpYSxyDv-tJzs7xsrMY'
+    Description: URL for audio playback
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs18.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        NODE_ENV: 'production'
+
+Resources:
+  # Lambda function for the voice assistant
+  VoiceAssistantFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambda.handler
+      Runtime: nodejs18.x
+      FunctionName: vozy-voice-assistant
+      Timeout: 30
+      MemorySize: 256
+      Tracing: Active
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/POST/@connections/*
+      Environment:
+        Variables:
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          VOZY_AUTH_TOKEN: !Ref VozyAuthToken
+          DOMAIN: 'placeholder.execute-api.example.com'
+          WS_URL: 'placeholder.websocket.url'
+          DEBUG: !Ref Debug
+          VOZY_API_URL: !Ref VozyApiUrl
+          WELCOME_GREETING: !Ref WelcomeGreeting
+          SYSTEM_PROMPT: !Ref SystemPrompt
+          TTS_PROVIDER: !Ref TtsProvider
+          VOICE: !Ref Voice
+          NLP_LANGUAGE: !Ref NlpLanguage
+          AUDIO_URL: !Ref AudioUrl
+      Events:
+        # HTTP API for TwiML endpoint
+        TwimlEndpoint:
+          Type: Api
+          Properties:
+            Path: /twiml
+            Method: ANY
+        # Health check endpoint
+        HealthEndpoint:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: GET
+        # WebSocket health check endpoint
+        WsHealthEndpoint:
+          Type: Api
+          Properties:
+            Path: /ws-health
+            Method: GET
+        # Note: The /ws endpoint is now handled by the WebSocketApi below, not by this REST API
+
+  DomainUpdaterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./custom-resource
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Timeout: 30
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref VoiceAssistantFunction
+        - Statement:
+            Effect: Allow
+            Action:
+              - lambda:GetFunctionConfiguration
+              - lambda:UpdateFunctionConfiguration
+            Resource: !GetAtt VoiceAssistantFunction.Arn
+            
+  DomainUpdaterResource:
+    Type: Custom::DomainUpdater
+    Properties:
+      Version: "0.0.1" # Real Version
+      ServiceToken: !GetAtt DomainUpdaterFunction.Arn
+      LambdaFunctionName: !Ref VoiceAssistantFunction
+      ApiGatewayUrl:
+        Fn::Sub: "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+      WebSocketApiUrl:
+        Fn::Sub: "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: VoiceAssistantWebSocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.type"
+
+  WebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VoiceAssistantFunction.Arn}/invocations
+
+  WebSocketDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  WebSocketConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  WebSocketDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  WebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - WebSocketDefaultRoute
+      - WebSocketConnectRoute
+      - WebSocketDisconnectRoute
+    Properties:
+      ApiId: !Ref WebSocketApi
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      DeploymentId: !Ref WebSocketDeployment
+      StageName: Prod
+      AutoDeploy: true
+
+  WebSocketPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref VoiceAssistantFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+Outputs:
+  HttpApiEndpoint:
+    Description: HTTP API Endpoint for TwiML
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+  WebSocketApiEndpoint:
+    Description: WebSocket API Endpoint
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
+  VoiceAssistantFunction:
+    Description: Voice Assistant Lambda Function ARN
+    Value: !GetAtt VoiceAssistantFunction.Arn
+  UpdateInstructions:
+    Description: Post-Deployment Instructions
+    Value: !Sub |
+      IMPORTANT: After deployment, update the Lambda environment variables:
+      1. Go to AWS Lambda Console
+      2. Open the function "${VoiceAssistantFunction}"
+      3. Go to the "Configuration" tab and select "Environment variables"
+      4. Update the DOMAIN variable to: ${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
+      5. Update the WS_URL variable to: wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
+      6. Save the changes
